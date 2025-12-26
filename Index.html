@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- PWA Support -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default"> 
+    <meta name="theme-color" content="#0d9488">
+    <link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoiTWVkVHJhY2siLCJzaG9ydF9uYW1lIjoiTWVkVHJhY2siLCJzdGFydF91cmwiOiIuLyIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwiYmFja2dyb3VuZF9jb2xvciI6IiNmZmZmZmYiLCJ0aGVtZV9jb2xvciI6IiMwZDk0ODgifQ==">
+    
+    <title>MedTrack - Advanced</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#1e293b', // Custom dark shade
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+        
+        .slide-in { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Modal Transitions */
+        .modal { opacity: 0; visibility: hidden; transition: all 0.2s ease-in-out; }
+        .modal.active { opacity: 1; visibility: visible; }
+        .modal-content { transform: scale(0.95); transition: all 0.2s ease-in-out; }
+        .modal.active .modal-content { transform: scale(1); }
+
+        /* Heatmap Grid */
+        .heatmap-grid {
+            display: grid;
+            grid-template-rows: repeat(7, 1fr);
+            grid-auto-flow: column;
+            gap: 2px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+        }
+        .heatmap-cell {
+            width: 10px;
+            height: 10px;
+            border-radius: 2px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen transition-colors duration-300 dark:bg-slate-900 dark:text-slate-100">
+
+    <!-- Hidden Input for Restore (Feature 1) -->
+    <input type="file" id="restoreInput" accept=".json" class="hidden">
+
+    <!-- Navbar -->
+    <nav class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-40 transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <div class="bg-teal-600 text-white p-2 rounded-lg shadow-lg shadow-teal-600/20">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                        </svg>
+                    </div>
+                    <span class="font-bold text-xl tracking-tight dark:text-white">MedTrack</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <!-- Dark Mode Toggle -->
+                    <button onclick="app.toggleDarkMode()" class="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                    </button>
+                    
+                    <!-- Settings Button -->
+                    <button onclick="app.openSettingsModal()" class="p-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </button>
+
+                    <button onclick="app.exportData()" class="hidden md:block text-sm text-slate-500 dark:text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 font-medium">Export CSV</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- Top Stats Row -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <!-- Overall Accuracy -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between h-32 relative overflow-hidden transition-colors">
+                <div class="absolute right-0 top-0 h-full w-2 bg-blue-500"></div>
+                <div>
+                    <p class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Overall Accuracy</p>
+                    <h2 class="text-3xl font-bold text-slate-800 dark:text-white mt-1" id="overallAccuracy">0%</h2>
+                </div>
+                <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden mt-2">
+                    <div id="overallProgressBar" class="bg-blue-500 h-full transition-all duration-500" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Total Questions -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between h-32 relative overflow-hidden transition-colors">
+                <div class="absolute right-0 top-0 h-full w-2 bg-indigo-500"></div>
+                <div>
+                    <p class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Questions</p>
+                    <h2 class="text-3xl font-bold text-slate-800 dark:text-white mt-1" id="totalQuestions">0</h2>
+                </div>
+                <div class="flex gap-4 text-sm mt-2">
+                    <span class="text-teal-600 dark:text-teal-400 font-medium"><span id="totalCorrect">0</span> Correct</span>
+                    <span class="text-rose-500 dark:text-rose-400 font-medium"><span id="totalWrong">0</span> Incorrect</span>
+                </div>
+            </div>
+
+            <!-- Strongest Subject -->
+            <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between h-32 relative overflow-hidden transition-colors">
+                <div class="absolute right-0 top-0 h-full w-2 bg-teal-500"></div>
+                <div>
+                    <p class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Strongest Subject</p>
+                    <h2 class="text-xl font-bold text-slate-800 dark:text-white mt-1 truncate" id="strongestSubject">-</h2>
+                </div>
+                <p class="text-sm text-slate-500 dark:text-slate-400" id="strongestStat">No data yet</p>
+            </div>
+
+             <!-- Weakest Subject -->
+             <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col justify-between h-32 relative overflow-hidden transition-colors">
+                <div class="absolute right-0 top-0 h-full w-2 bg-rose-500"></div>
+                <div>
+                    <p class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Needs Focus</p>
+                    <h2 class="text-xl font-bold text-slate-800 dark:text-white mt-1 truncate" id="weakestSubject">-</h2>
+                </div>
+                <p class="text-sm text-slate-500 dark:text-slate-400" id="weakestStat">No data yet</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Left Column: Input Form -->
+            <div class="lg:col-span-1 space-y-6">
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 overflow-hidden sticky top-24 transition-colors">
+                    <div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+                        <h3 class="font-bold text-lg text-slate-800 dark:text-white">Add Practice Session</h3>
+                    </div>
+                    <form id="entryForm" class="p-6 space-y-5">
+                        
+                        <!-- Subject Input -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Subject</label>
+                            <div class="relative">
+                                <input type="text" id="subjectInput" list="subjectList" required
+                                    class="w-full pl-3 pr-10 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-colors dark:text-white"
+                                    placeholder="e.g. Cardiology...">
+                                <datalist id="subjectList"></datalist>
+                            </div>
+                        </div>
+
+                        <!-- MCQ Set Name -->
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">MCQ Set Name</label>
+                            <input type="text" id="setName" required
+                                class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition-colors dark:text-white"
+                                placeholder="e.g. Qbank Block 1">
+                        </div>
+                        
+                        <!-- Tags and Time -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Time (mins)</label>
+                                <input type="number" id="timeTaken" min="0"
+                                    class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none transition-colors dark:text-white"
+                                    placeholder="Opt.">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tags</label>
+                                <input type="text" id="tagsInput"
+                                    class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 outline-none transition-colors dark:text-white"
+                                    placeholder="#difficult, #review">
+                            </div>
+                        </div>
+
+                        <!-- Scores Grid -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-teal-700 dark:text-teal-400 mb-1">Correct</label>
+                                <input type="number" id="correctCount" min="0" required
+                                    class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none font-bold text-teal-700 dark:text-teal-400"
+                                    placeholder="0">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-rose-700 dark:text-rose-400 mb-1">Incorrect</label>
+                                <input type="number" id="wrongCount" min="0" required
+                                    class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none font-bold text-rose-700 dark:text-rose-400"
+                                    placeholder="0">
+                            </div>
+                        </div>
+
+                        <!-- Add Button -->
+                        <button type="submit" 
+                            class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:shadow-lg transform transition-all active:scale-95 flex items-center justify-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" />
+                            </svg>
+                            Add Entry
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Heatmap Small Widget -->
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-4 transition-colors">
+                    <h4 class="text-sm font-bold text-slate-800 dark:text-white mb-2">Study Consistency (1 Year)</h4>
+                    <div id="heatmapContainer" class="heatmap-grid">
+                        <!-- Heatmap generated by JS -->
+                    </div>
+                    <div class="flex justify-between text-xs text-slate-400 mt-2">
+                        <span>Less</span>
+                        <span>More</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Dashboard -->
+            <div class="lg:col-span-2 space-y-8">
+                
+                <!-- Overall Chart Section -->
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 transition-colors">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+                        <div>
+                            <h3 class="font-bold text-lg text-slate-800 dark:text-white">Overall Progress</h3>
+                            <span class="text-xs text-slate-400 dark:text-slate-500" id="chartSubtitle">Track your accuracy over time</span>
+                        </div>
+                        
+                        <div class="flex items-center gap-3">
+                            <!-- Feature 13: Ghost Mode Toggle -->
+                            <button onclick="app.toggleGhostMode()" id="btn-ghost" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700">
+                                <span class="text-base">👻</span> Ghost Mode
+                            </button>
+
+                            <!-- Filter Buttons -->
+                            <div class="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-1">
+                                <button onclick="app.setChartPeriod('day')" id="btn-day" class="px-3 py-1 text-xs font-medium rounded-md transition-colors bg-white dark:bg-slate-600 text-slate-800 dark:text-white shadow-sm">Day</button>
+                                <button onclick="app.setChartPeriod('week')" id="btn-week" class="px-3 py-1 text-xs font-medium rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">Week</button>
+                                <button onclick="app.setChartPeriod('month')" id="btn-month" class="px-3 py-1 text-xs font-medium rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors">Month</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="h-64 w-full relative">
+                        <canvas id="overallChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Subject Performance Cards -->
+                <div>
+                    <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                        Performance by Subject
+                        <span class="text-xs font-normal text-slate-500 ml-2">(Click for details)</span>
+                    </h3>
+                    
+                    <div id="subjectGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <!-- Subject Cards Injected Here -->
+                    </div>
+                </div>
+
+                <!-- History Table -->
+                <div class="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors">
+                    <div class="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-bold text-lg text-slate-800 dark:text-white">History</h3>
+                            <span class="text-xs font-medium bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded-full" id="historyCount">0</span>
+                        </div>
+                        
+                        <!-- Search Bar -->
+                        <div class="relative w-full sm:w-64">
+                            <input type="text" id="historySearch" placeholder="Search logs..." 
+                                class="w-full pl-9 pr-3 py-1.5 text-sm bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-1 focus:ring-teal-500 outline-none text-slate-800 dark:text-white">
+                            <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 dark:bg-slate-700/50 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200 dark:border-slate-700">
+                                    <th class="px-6 py-3">Date</th>
+                                    <th class="px-6 py-3">Details</th>
+                                    <th class="px-6 py-3 text-center">Stats</th>
+                                    <th class="px-6 py-3 text-center">Score</th>
+                                    <th class="px-6 py-3 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyTableBody" class="divide-y divide-slate-100 dark:divide-slate-700">
+                                <!-- Rows injected here -->
+                            </tbody>
+                        </table>
+                        <div id="emptyHistoryMsg" class="text-center py-8 text-slate-400 dark:text-slate-500 text-sm">
+                            No logs found.
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Subject Detail Modal -->
+    <div id="subjectModal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="app.closeModal('subjectModal')"></div>
+        <div class="modal-content bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl relative z-10 flex flex-col max-h-[90vh] transition-colors">
+            
+            <div class="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-700">
+                <div>
+                    <h2 id="modalSubjectTitle" class="text-2xl font-bold text-slate-800 dark:text-white">Subject Name</h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400">Analytics</p>
+                </div>
+                <button onclick="app.closeModal('subjectModal')" class="text-slate-400 hover:text-slate-600 dark:hover:text-white p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+            </div>
+
+            <div class="p-6 overflow-y-auto">
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600 text-center">
+                        <p class="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Total Qs</p>
+                        <p id="modalTotalQs" class="text-xl font-bold text-slate-800 dark:text-white">0</p>
+                    </div>
+                    <div class="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600 text-center">
+                        <p class="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Accuracy</p>
+                        <p id="modalAccuracy" class="text-xl font-bold text-teal-600 dark:text-teal-400">0%</p>
+                    </div>
+                    <div class="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl border border-slate-200 dark:border-slate-600 text-center">
+                        <p class="text-xs text-slate-500 dark:text-slate-400 uppercase font-semibold">Target Gap</p>
+                        <p id="modalGap" class="text-xl font-bold text-indigo-600 dark:text-indigo-400">0%</p>
+                    </div>
+                </div>
+                <div class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+                    <div class="h-64">
+                        <canvas id="subjectChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="app.closeModal('settingsModal')"></div>
+        <div class="modal-content bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md relative z-10 flex flex-col max-h-[90vh] transition-colors">
+            
+            <div class="p-6 border-b border-slate-100 dark:border-slate-700">
+                <h2 class="text-xl font-bold text-slate-800 dark:text-white">Settings</h2>
+                <p class="text-sm text-slate-500 dark:text-slate-400">Configure your study goals & data</p>
+            </div>
+
+            <div class="p-6 overflow-y-auto space-y-6">
+                
+                <!-- Target Settings -->
+                <div>
+                    <h4 class="text-sm font-bold text-slate-800 dark:text-white mb-3">Goals</h4>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Default Target Score (%)</label>
+                            <input type="number" id="settingDefaultTarget" min="1" max="100" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-800 dark:text-white focus:ring-2 focus:ring-teal-500 outline-none">
+                        </div>
+                        
+                        <div>
+                            <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase mb-2">Subject Specific</p>
+                            <div id="settingsSubjectList" class="space-y-3 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                                <!-- Injected via JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="border-slate-200 dark:border-slate-700">
+                
+                <!-- Data Management (Feature 1) -->
+                <div>
+                    <h4 class="text-sm font-bold text-slate-800 dark:text-white mb-3">Data Management</h4>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="app.backupData()" class="flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-white rounded-lg transition-colors font-medium text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Backup JSON
+                        </button>
+                        <button onclick="app.triggerRestore()" class="flex items-center justify-center gap-2 px-4 py-3 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-white rounded-lg transition-colors font-medium text-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                            </svg>
+                            Restore JSON
+                        </button>
+                    </div>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 mt-2">Use Backup to move data between devices.</p>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 rounded-b-2xl flex justify-end gap-2">
+                <button onclick="app.closeModal('settingsModal')" class="px-4 py-2 text-slate-500 hover:text-slate-700 font-medium">Cancel</button>
+                <button onclick="app.saveSettings()" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-lg shadow-sm">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const app = {
+            data: [],
+            settings: {
+                darkMode: false,
+                defaultTarget: 70,
+                subjectTargets: {}
+            },
+            uiState: {
+                chartPeriod: 'day', // 'day', 'week', 'month'
+                ghostMode: false,
+                searchTerm: ''
+            },
+            charts: { overall: null, subject: null },
+            
+            init() {
+                const storedData = localStorage.getItem('medTrackData');
+                if (storedData) this.data = JSON.parse(storedData);
+                
+                const storedSettings = localStorage.getItem('medTrackSettings');
+                if (storedSettings) this.settings = {...this.settings, ...JSON.parse(storedSettings)};
+
+                this.cacheDOM();
+                this.bindEvents();
+                
+                if (this.settings.darkMode) document.documentElement.classList.add('dark');
+
+                this.render();
+            },
+
+            cacheDOM() {
+                this.dom = {
+                    form: document.getElementById('entryForm'),
+                    subjectInput: document.getElementById('subjectInput'),
+                    setName: document.getElementById('setName'),
+                    correct: document.getElementById('correctCount'),
+                    wrong: document.getElementById('wrongCount'),
+                    timeTaken: document.getElementById('timeTaken'),
+                    tagsInput: document.getElementById('tagsInput'),
+                    subjectList: document.getElementById('subjectList'),
+                    subjectGrid: document.getElementById('subjectGrid'),
+                    historyBody: document.getElementById('historyTableBody'),
+                    emptyHistoryMsg: document.getElementById('emptyHistoryMsg'),
+                    historyCount: document.getElementById('historyCount'),
+                    heatmap: document.getElementById('heatmapContainer'),
+                    historySearch: document.getElementById('historySearch'),
+                    restoreInput: document.getElementById('restoreInput'),
+                    
+                    // Stats
+                    overallAccuracy: document.getElementById('overallAccuracy'),
+                    overallProgress: document.getElementById('overallProgressBar'),
+                    totalQuestions: document.getElementById('totalQuestions'),
+                    totalCorrect: document.getElementById('totalCorrect'),
+                    totalWrong: document.getElementById('totalWrong'),
+                    strongestSubject: document.getElementById('strongestSubject'),
+                    strongestStat: document.getElementById('strongestStat'),
+                    weakestSubject: document.getElementById('weakestSubject'),
+                    weakestStat: document.getElementById('weakestStat'),
+
+                    // Modals
+                    subjectModal: document.getElementById('subjectModal'),
+                    settingsModal: document.getElementById('settingsModal'),
+                    
+                    // Settings Inputs
+                    settingDefaultTarget: document.getElementById('settingDefaultTarget'),
+                    settingsSubjectList: document.getElementById('settingsSubjectList'),
+                    
+                    // Chart Buttons
+                    btnGhost: document.getElementById('btn-ghost'),
+                    btnDay: document.getElementById('btn-day'),
+                    btnWeek: document.getElementById('btn-week'),
+                    btnMonth: document.getElementById('btn-month'),
+                    chartSubtitle: document.getElementById('chartSubtitle')
+                };
+            },
+
+            bindEvents() {
+                this.dom.form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+                    this.addEntry();
+                });
+                
+                this.dom.historySearch.addEventListener('keyup', (e) => {
+                    this.uiState.searchTerm = e.target.value.toLowerCase();
+                    this.renderHistory();
+                });
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        this.closeModal('subjectModal');
+                        this.closeModal('settingsModal');
+                    }
+                });
+
+                // Restore Listener
+                this.dom.restoreInput.addEventListener('change', (e) => this.restoreData(e));
+            },
+
+            // --- Feature 1: Backup & Restore ---
+            backupData() {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.data));
+                const downloadAnchorNode = document.createElement('a');
+                downloadAnchorNode.setAttribute("href", dataStr);
+                downloadAnchorNode.setAttribute("download", "medtrack_backup_" + new Date().toISOString().slice(0,10) + ".json");
+                document.body.appendChild(downloadAnchorNode);
+                downloadAnchorNode.click();
+                downloadAnchorNode.remove();
+            },
+
+            triggerRestore() {
+                this.dom.restoreInput.click();
+            },
+
+            restoreData(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const imported = JSON.parse(e.target.result);
+                        if (Array.isArray(imported)) {
+                            if(confirm(`Restore ${imported.length} entries? This will replace your current data.`)) {
+                                this.data = imported;
+                                this.saveData();
+                                this.render();
+                                this.closeModal('settingsModal');
+                                alert('Restored successfully!');
+                            }
+                        } else {
+                            alert('Invalid backup file.');
+                        }
+                    } catch(err) {
+                        alert('Error reading file. Please upload a valid JSON backup.');
+                    }
+                };
+                reader.readAsText(file);
+                event.target.value = ''; // Reset input
+            },
+
+            // --- Feature 5: Grade Helper ---
+            getGrade(p) {
+                if (p >= 80) return { letter: 'A', color: 'bg-teal-100 text-teal-800 dark:bg-teal-900/50 dark:text-teal-300' };
+                if (p >= 70) return { letter: 'B', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300' };
+                if (p >= 60) return { letter: 'C', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300' };
+                if (p >= 50) return { letter: 'D', color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300' };
+                return { letter: 'F', color: 'bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300' };
+            },
+
+            // --- Core Data Logic ---
+
+            addEntry() {
+                const subject = this.dom.subjectInput.value.trim();
+                const name = this.dom.setName.value.trim();
+                const correct = parseInt(this.dom.correct.value);
+                const wrong = parseInt(this.dom.wrong.value);
+                const time = parseInt(this.dom.timeTaken.value) || 0;
+                const tags = this.dom.tagsInput.value.split(',').map(t => t.trim()).filter(t => t);
+
+                if (!subject || !name || isNaN(correct) || isNaN(wrong)) return;
+
+                const entry = {
+                    id: Date.now(),
+                    date: new Date().toISOString(),
+                    subject,
+                    name,
+                    correct,
+                    wrong,
+                    time,
+                    tags,
+                    total: correct + wrong,
+                    accuracy: ((correct / (correct + wrong)) * 100) || 0
+                };
+
+                this.data.unshift(entry); 
+                this.saveData();
+                this.render();
+                this.dom.form.reset();
+                this.dom.subjectInput.focus();
+            },
+
+            deleteEntry(id) {
+                if(confirm('Delete this entry?')) {
+                    this.data = this.data.filter(item => item.id !== id);
+                    this.saveData();
+                    this.render();
+                }
+            },
+
+            saveData() {
+                localStorage.setItem('medTrackData', JSON.stringify(this.data));
+            },
+
+            saveSettingsLocal() {
+                localStorage.setItem('medTrackSettings', JSON.stringify(this.settings));
+            },
+
+            // --- Settings & UI Logic ---
+
+            toggleDarkMode() {
+                this.settings.darkMode = !this.settings.darkMode;
+                if (this.settings.darkMode) document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+                this.saveSettingsLocal();
+            },
+
+            openSettingsModal() {
+                this.dom.settingDefaultTarget.value = this.settings.defaultTarget;
+                const subjects = [...new Set(this.data.map(d => d.subject))].sort();
+                this.dom.settingsSubjectList.innerHTML = subjects.length ? subjects.map(sub => {
+                    const currentTarget = this.settings.subjectTargets[sub] || this.settings.defaultTarget;
+                    return `
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm font-medium text-slate-700 dark:text-slate-300 truncate w-1/2" title="${sub}">${sub}</span>
+                            <div class="flex items-center gap-2">
+                                <input type="number" min="1" max="100" data-subject="${sub}" value="${currentTarget}" 
+                                    class="subject-target-input w-20 px-2 py-1 text-sm border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:ring-1 focus:ring-teal-500 outline-none">
+                                <span class="text-xs text-slate-500">%</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('') : '<p class="text-xs text-slate-400 italic">No subjects added yet.</p>';
+                this.dom.settingsModal.classList.add('active');
+            },
+
+            saveSettings() {
+                this.settings.defaultTarget = parseInt(this.dom.settingDefaultTarget.value) || 70;
+                const inputs = document.querySelectorAll('.subject-target-input');
+                inputs.forEach(input => {
+                    const sub = input.dataset.subject;
+                    const val = parseInt(input.value);
+                    if (val && val !== this.settings.defaultTarget) {
+                        this.settings.subjectTargets[sub] = val;
+                    } else {
+                        delete this.settings.subjectTargets[sub];
+                    }
+                });
+                this.saveSettingsLocal();
+                this.closeModal('settingsModal');
+                this.render();
+            },
+
+            closeModal(modalId) {
+                document.getElementById(modalId).classList.remove('active');
+            },
+
+            getSubjectStats() {
+                const stats = {};
+                this.data.forEach(entry => {
+                    if (!stats[entry.subject]) {
+                        stats[entry.subject] = {
+                            name: entry.subject,
+                            correct: 0,
+                            wrong: 0,
+                            total: 0,
+                            sessions: 0,
+                            target: this.settings.subjectTargets[entry.subject] || this.settings.defaultTarget
+                        };
+                    }
+                    stats[entry.subject].correct += entry.correct;
+                    stats[entry.subject].wrong += entry.wrong;
+                    stats[entry.subject].total += entry.total;
+                    stats[entry.subject].sessions += 1;
+                });
+                return Object.values(stats).map(subj => {
+                    subj.accuracy = subj.total === 0 ? 0 : (subj.correct / subj.total) * 100;
+                    return subj;
+                });
+            },
+
+            // --- Charting Logic ---
+
+            toggleGhostMode() {
+                this.uiState.ghostMode = !this.uiState.ghostMode;
+                // Ghost Mode only works well for week/month comparison, not 'day' (which is all-time daily)
+                // If user toggles Ghost Mode on, force to Month view if currently on Day
+                if (this.uiState.ghostMode && this.uiState.chartPeriod === 'day') {
+                    this.uiState.chartPeriod = 'month';
+                }
+                this.renderChartControls();
+                this.renderChart('overallChart', 'overall');
+            },
+
+            setChartPeriod(period) {
+                this.uiState.chartPeriod = period;
+                // If switching to Day view, turn off ghost mode as it's less useful there
+                if (period === 'day') this.uiState.ghostMode = false;
+                this.renderChartControls();
+                this.renderChart('overallChart', 'overall');
+            },
+
+            renderChartControls() {
+                // Period Buttons
+                ['btnDay', 'btnWeek', 'btnMonth'].forEach(btn => {
+                    const el = this.dom[btn];
+                    const isActive = this.uiState.chartPeriod === btn.replace('btn', '').toLowerCase();
+                    el.className = isActive 
+                        ? 'px-3 py-1 text-xs font-medium rounded-md transition-colors bg-white dark:bg-slate-600 text-slate-800 dark:text-white shadow-sm'
+                        : 'px-3 py-1 text-xs font-medium rounded-md transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white';
+                });
+
+                // Ghost Button
+                const ghostBtn = this.dom.btnGhost;
+                if (this.uiState.ghostMode) {
+                    ghostBtn.className = "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all border border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300";
+                    ghostBtn.innerHTML = '<span class="text-base">👻</span> Ghost On';
+                    
+                    // Update Subtitle
+                    let label = "";
+                    if(this.uiState.chartPeriod === 'month') label = "Comparing This Month vs Last Month";
+                    else if(this.uiState.chartPeriod === 'week') label = "Comparing This Week vs Last Week";
+                    this.dom.chartSubtitle.innerText = label;
+                } else {
+                    ghostBtn.className = "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-all border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700";
+                    ghostBtn.innerHTML = '<span class="text-base">👻</span> Ghost Mode';
+                    this.dom.chartSubtitle.innerText = "Track your accuracy over time";
+                }
+            },
+
+            getChartData(subjectFilter = null) {
+                const isGhost = this.uiState.ghostMode;
+                const period = this.uiState.chartPeriod;
+
+                let filteredData = subjectFilter 
+                    ? this.data.filter(d => d.subject === subjectFilter) 
+                    : this.data;
+                
+                if (filteredData.length === 0) return { labels: [], datasets: [] };
+
+                // --- Standard Trend Logic (Ghost OFF) ---
+                if (!isGhost) {
+                    const groups = {};
+                    filteredData.forEach(d => {
+                        const date = moment(d.date);
+                        let key;
+                        if (period === 'day') key = date.format('YYYY-MM-DD');
+                        else if (period === 'week') key = date.format('GGGG-[W]WW'); 
+                        else key = date.format('YYYY-MM');
+                        
+                        if (!groups[key]) groups[key] = { correct: 0, total: 0, dateObj: date };
+                        groups[key].correct += d.correct;
+                        groups[key].total += d.total;
+                    });
+
+                    const sortedKeys = Object.keys(groups).sort();
+                    const labels = sortedKeys.map(k => {
+                        const g = groups[k];
+                        if (period === 'day') return g.dateObj.format('MMM D');
+                        if (period === 'week') return 'W' + g.dateObj.isoWeek();
+                        return g.dateObj.format('MMM YYYY');
+                    });
+                    const data = sortedKeys.map(k => (groups[k].correct / groups[k].total) * 100);
+
+                    return {
+                        labels,
+                        datasets: [{ data, label: 'Current' }]
+                    };
+                }
+
+                // --- Ghost Mode Logic (Ghost ON) ---
+                // We compare Current Period vs Previous Period on a shared X-axis (Day 1..N)
+                
+                let currentStart, currentEnd, prevStart, prevEnd;
+                let dateFormat, labelFormat;
+                let xLabels = [];
+
+                if (period === 'month') {
+                    currentStart = moment().startOf('month');
+                    currentEnd = moment().endOf('month');
+                    prevStart = moment().subtract(1, 'month').startOf('month');
+                    prevEnd = moment().subtract(1, 'month').endOf('month');
+                    dateFormat = 'D'; // Group by Day of Month (1-31)
+                    // Generate 1-31 labels
+                    for(let i=1; i<=31; i++) xLabels.push(i);
+                } else { // Week
+                    currentStart = moment().startOf('isoWeek');
+                    currentEnd = moment().endOf('isoWeek');
+                    prevStart = moment().subtract(1, 'week').startOf('isoWeek');
+                    prevEnd = moment().subtract(1, 'week').endOf('isoWeek');
+                    dateFormat = 'E'; // Group by Day of Week (1-7)
+                    xLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                }
+
+                const processRange = (start, end) => {
+                    const group = {};
+                    filteredData.forEach(d => {
+                        const m = moment(d.date);
+                        if (m.isBetween(start, end, undefined, '[]')) {
+                            const key = period === 'month' ? m.date() : m.isoWeekday();
+                            if (!group[key]) group[key] = { correct: 0, total: 0 };
+                            group[key].correct += d.correct;
+                            group[key].total += d.total;
+                        }
+                    });
+                    // Map to xLabels array length
+                    const result = [];
+                    const max = period === 'month' ? 31 : 7;
+                    for(let i=1; i<=max; i++) {
+                        if(group[i]) result.push((group[i].correct / group[i].total) * 100);
+                        else result.push(null); // Gap for days with no data
+                    }
+                    return result;
+                };
+
+                const currentData = processRange(currentStart, currentEnd);
+                const prevData = processRange(prevStart, prevEnd);
+
+                return {
+                    labels: xLabels,
+                    datasets: [
+                        { data: currentData, label: 'This ' + (period === 'month' ? 'Month' : 'Week') },
+                        { data: prevData, label: 'Last ' + (period === 'month' ? 'Month' : 'Week'), isGhost: true }
+                    ]
+                };
+            },
+
+            renderChart(canvasId, type, subjectName = null) {
+                const ctx = document.getElementById(canvasId).getContext('2d');
+                const chartData = this.getChartData(subjectName);
+                
+                const isDark = document.documentElement.classList.contains('dark');
+                const gridColor = isDark ? '#334155' : '#f1f5f9';
+                const textColor = isDark ? '#94a3b8' : '#64748b';
+                
+                // Color Config
+                const mainColor = subjectName ? '#0D9488' : '#3B82F6';
+                const ghostColor = isDark ? '#64748b' : '#94a3b8';
+
+                if (this.charts[type]) this.charts[type].destroy();
+
+                const datasets = chartData.datasets.map(ds => {
+                    if (ds.isGhost) {
+                        return {
+                            label: ds.label,
+                            data: ds.data,
+                            borderColor: ghostColor,
+                            borderWidth: 2,
+                            borderDash: [5, 5], // Dashed line
+                            tension: 0.3,
+                            pointRadius: 0, // Hide points for cleaner look
+                            pointHoverRadius: 4,
+                            fill: false
+                        };
+                    } else {
+                        return {
+                            label: ds.label,
+                            data: ds.data,
+                            borderColor: mainColor,
+                            backgroundColor: mainColor + '20',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            fill: !this.uiState.ghostMode, // Only fill if not in ghost mode (cleaner)
+                            pointRadius: 4,
+                            pointHoverRadius: 6
+                        };
+                    }
+                });
+
+                this.charts[type] = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: chartData.labels,
+                        datasets: datasets
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        plugins: {
+                            legend: { 
+                                display: this.uiState.ghostMode, // Show legend only in Ghost Mode
+                                labels: { color: textColor }
+                            },
+                            tooltip: { 
+                                callbacks: { label: (c) => `${c.dataset.label}: ${c.raw ? c.raw.toFixed(1) + '%' : 'No data'}` } 
+                            }
+                        },
+                        scales: {
+                            y: {
+                                min: 0, max: 100,
+                                grid: { color: gridColor },
+                                ticks: { color: textColor }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: textColor, maxTicksLimit: 10 }
+                            }
+                        }
+                    }
+                });
+            },
+
+            renderHeatmap() {
+                const container = this.dom.heatmap;
+                container.innerHTML = '';
+                
+                const activityMap = {};
+                this.data.forEach(d => {
+                    const k = d.date.split('T')[0];
+                    activityMap[k] = (activityMap[k] || 0) + 1;
+                });
+
+                const today = new Date();
+                const oneYearAgo = new Date();
+                oneYearAgo.setFullYear(today.getFullYear() - 1);
+                
+                let currentDate = new Date(oneYearAgo);
+                currentDate.setDate(currentDate.getDate() - currentDate.getDay());
+
+                const cells = [];
+                while (currentDate <= today) {
+                    const dateStr = currentDate.toISOString().split('T')[0];
+                    const count = activityMap[dateStr] || 0;
+                    
+                    let colorClass = 'bg-slate-200 dark:bg-slate-700';
+                    if (count > 0) colorClass = 'bg-teal-200';
+                    if (count > 2) colorClass = 'bg-teal-400';
+                    if (count > 5) colorClass = 'bg-teal-600';
+                    
+                    const cell = document.createElement('div');
+                    cell.className = `heatmap-cell ${colorClass}`;
+                    cell.title = `${dateStr}: ${count} sessions`;
+                    cells.push(cell);
+
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+                
+                cells.forEach(c => container.appendChild(c));
+            },
+
+            render() {
+                this.renderDatalist();
+                this.renderHistory();
+                this.renderStats();
+                this.renderHeatmap();
+                // Initial renderChartControls call
+                this.renderChartControls();
+                if (this.data.length > 0 || this.charts.overall) {
+                    this.renderChart('overallChart', 'overall');
+                }
+            },
+
+            renderDatalist() {
+                const subjects = [...new Set(this.data.map(d => d.subject))].sort();
+                this.dom.subjectList.innerHTML = subjects.map(s => `<option value="${s}">`).join('');
+            },
+
+            renderStats() {
+                const totalCorrect = this.data.reduce((sum, item) => sum + item.correct, 0);
+                const totalWrong = this.data.reduce((sum, item) => sum + item.wrong, 0);
+                const totalQuestions = totalCorrect + totalWrong;
+                const overallAcc = totalQuestions === 0 ? 0 : (totalCorrect / totalQuestions) * 100;
+
+                this.dom.overallAccuracy.innerText = `${overallAcc.toFixed(1)}%`;
+                this.dom.overallProgress.style.width = `${overallAcc}%`;
+                this.dom.overallProgress.className = `h-full transition-all duration-500 ${this.getColorClass(overallAcc)}`;
+
+                this.dom.totalQuestions.innerText = totalQuestions;
+                this.dom.totalCorrect.innerText = totalCorrect;
+                this.dom.totalWrong.innerText = totalWrong;
+
+                const subjectStats = this.getSubjectStats();
+                
+                if (subjectStats.length > 0) {
+                    const sorted = [...subjectStats].sort((a, b) => b.accuracy - a.accuracy);
+                    const best = sorted[0];
+                    const worst = sorted[sorted.length - 1];
+
+                    this.dom.strongestSubject.innerText = best.name;
+                    this.dom.strongestStat.innerText = `${best.accuracy.toFixed(1)}% (${best.correct}/${best.total})`;
+
+                    this.dom.weakestSubject.innerText = worst.name;
+                    this.dom.weakestStat.innerText = `${worst.accuracy.toFixed(1)}% (${worst.correct}/${worst.total})`;
+                }
+
+                if (subjectStats.length === 0) {
+                    this.dom.subjectGrid.innerHTML = `
+                        <div class="col-span-full text-center py-10 bg-white dark:bg-slate-800 rounded-xl border border-dashed border-slate-300 dark:border-slate-700">
+                            <p class="text-slate-400">Add your first session to see subject breakdown.</p>
+                        </div>`;
+                } else {
+                    this.dom.subjectGrid.innerHTML = subjectStats.sort((a,b) => b.sessions - a.sessions).map(sub => {
+                        const colorClass = this.getColorClass(sub.accuracy);
+                        const targetDiff = sub.accuracy - sub.target;
+                        const diffColor = targetDiff >= 0 ? 'text-teal-500' : 'text-rose-500';
+                        const diffIcon = targetDiff >= 0 ? '↑' : '↓';
+                        
+                        return `
+                        <div onclick="app.openSubjectDetails('${sub.name}')" class="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all cursor-pointer slide-in group active:scale-[0.98]">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-bold text-slate-800 dark:text-white truncate pr-2 group-hover:text-teal-600 transition-colors">${sub.name}</h4>
+                                <span class="text-xs font-semibold bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded">${sub.sessions} sets</span>
+                            </div>
+                            
+                            <div class="flex items-end justify-between mb-2">
+                                <div class="flex items-end gap-2">
+                                    <span class="text-2xl font-bold ${this.getTextColorClass(sub.accuracy)}">${sub.accuracy.toFixed(1)}%</span>
+                                    <span class="text-xs text-slate-400 mb-1">accuracy</span>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs text-slate-400 block">Target: ${sub.target}%</span>
+                                    <span class="text-xs font-bold ${diffColor}">${diffIcon} ${Math.abs(targetDiff).toFixed(1)}%</span>
+                                </div>
+                            </div>
+
+                            <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden mb-3 relative">
+                                <div class="${colorClass} h-full" style="width: ${sub.accuracy}%"></div>
+                                <!-- Target Marker -->
+                                <div class="absolute top-0 bottom-0 w-1 bg-slate-800 dark:bg-white opacity-50" style="left: ${sub.target}%" title="Target: ${sub.target}%"></div>
+                            </div>
+
+                            <div class="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                                <span><span class="font-bold text-teal-600 dark:text-teal-400">${sub.correct}</span> correct</span>
+                                <span><span class="font-bold text-rose-500 dark:text-rose-400">${sub.wrong}</span> incorrect</span>
+                            </div>
+                        </div>
+                        `;
+                    }).join('');
+                }
+            },
+
+            renderHistory() {
+                const term = this.uiState.searchTerm;
+                const filtered = this.data.filter(item => 
+                    item.subject.toLowerCase().includes(term) || 
+                    item.name.toLowerCase().includes(term) ||
+                    (item.tags && item.tags.some(t => t.toLowerCase().includes(term)))
+                );
+
+                this.dom.historyCount.innerText = filtered.length;
+
+                if (filtered.length === 0) {
+                    this.dom.historyBody.innerHTML = '';
+                    this.dom.emptyHistoryMsg.style.display = 'block';
+                    return;
+                }
+
+                this.dom.emptyHistoryMsg.style.display = 'none';
+                
+                this.dom.historyBody.innerHTML = filtered.map(item => {
+                    const minPerQ = item.time > 0 ? (item.time / item.total).toFixed(1) : '-';
+                    const tagsHtml = item.tags && item.tags.length > 0 
+                        ? `<div class="flex flex-wrap gap-1 mt-1">${item.tags.map(t => `<span class="px-1.5 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-[10px] rounded border border-indigo-100 dark:border-indigo-800">#${t}</span>`).join('')}</div>`
+                        : '';
+                    
+                    // Feature 5: Grades
+                    const grade = this.getGrade(item.accuracy);
+
+                    return `
+                    <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors group slide-in">
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
+                            ${new Date(item.date).toLocaleDateString()}
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-bold text-slate-800 dark:text-white">${item.subject}</div>
+                            <div class="text-xs text-slate-500 dark:text-slate-400">${item.name}</div>
+                            ${tagsHtml}
+                        </td>
+                        <td class="px-6 py-4 text-center text-xs text-slate-500 dark:text-slate-400">
+                            <div>${minPerQ}m/q</div>
+                            <div>${item.time > 0 ? item.time+'m' : ''}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-center">
+                            <div class="flex flex-col items-center gap-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="block text-sm font-bold ${this.getTextColorClass(item.accuracy)}">
+                                        ${item.accuracy.toFixed(0)}%
+                                    </span>
+                                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded ${grade.color}">
+                                        ${grade.letter}
+                                    </span>
+                                </div>
+                                <span class="text-xs text-slate-400">${item.correct}/${item.total}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button onclick="app.deleteEntry(${item.id})" class="text-slate-400 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </td>
+                    </tr>
+                `}).join('');
+            },
+
+            // --- Modals ---
+            openSubjectDetails(subjectName) {
+                const stats = this.getSubjectStats().find(s => s.name === subjectName);
+                if (!stats) return;
+
+                document.getElementById('modalSubjectTitle').innerText = subjectName;
+                document.getElementById('modalTotalQs').innerText = stats.total;
+                document.getElementById('modalAccuracy').innerText = stats.accuracy.toFixed(1) + '%';
+                
+                const gap = stats.accuracy - stats.target;
+                const gapEl = document.getElementById('modalGap');
+                gapEl.innerText = (gap > 0 ? '+' : '') + gap.toFixed(1) + '%';
+                gapEl.className = `text-xl font-bold ${gap >= 0 ? 'text-teal-600' : 'text-rose-500'}`;
+
+                document.getElementById('subjectModal').classList.add('active');
+                
+                requestAnimationFrame(() => this.renderChart('subjectChart', 'subject', subjectName));
+            },
+
+            // --- Helpers ---
+            exportData() {
+                if (this.data.length === 0) return alert('No data.');
+                let csv = "Date,Subject,Set,Correct,Incorrect,Total,Accuracy,Time(m),Tags\n";
+                this.data.forEach(r => {
+                    csv += `${new Date(r.date).toLocaleDateString()},"${r.subject}","${r.name}",${r.correct},${r.wrong},${r.total},${r.accuracy.toFixed(1)},${r.time||0},"${(r.tags||[]).join(';')}"\n`;
+                });
+                const link = document.createElement("a");
+                link.href = "data:text/csv;charset=utf-8," + encodeURI(csv);
+                link.download = "medtrack_export.csv";
+                link.click();
+            },
+            
+            clearData() {
+                if(confirm('Clear all data?')) {
+                    this.data = [];
+                    this.saveData();
+                    this.render();
+                }
+            },
+
+            getColorClass(p) { return p >= 75 ? 'bg-teal-500' : p >= 50 ? 'bg-yellow-400' : 'bg-rose-500'; },
+            getTextColorClass(p) { return p >= 75 ? 'text-teal-600 dark:text-teal-400' : p >= 50 ? 'text-yellow-600 dark:text-yellow-400' : 'text-rose-600 dark:text-rose-400'; }
+        };
+
+        document.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
